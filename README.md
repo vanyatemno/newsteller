@@ -12,7 +12,7 @@ This project is a news teller application built with Go.
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/vanyatemno/newsteller
     cd newsteller
     ```
 2.  **Set up environment variables:**
@@ -101,38 +101,69 @@ The following diagram illustrates the high-level interaction between the main co
 
 ```mermaid
 graph TD
-    User[User/Client] -->|HTTP Request| BackendAPI[Go Backend (Fiber API)]
-
-    subgraph Dockerized Services
-        BackendAPI -->|CRUD Operations| MongoDB[(MongoDB Database)]
-        BackendAPI -->|Serves HTML| Templates[HTML Templates]
-        MongoExpress[Mongo Express UI] -->|Administers| MongoDB
+    subgraph "User Request Flow"
+        Client[Client/Browser] -->|HTTP Request| WebServer[Fiber Web Server]
     end
 
-    BackendAPI -->|Reads Config| Config[Configuration (.env, Viper)]
-    BackendAPI -->|Logs| Logging[Logging (Zap)]
+    subgraph "Application Core"
+        Main["cmd/main.go"] --> Config["internal/config"]
+        Main --> DB["internal/db (MongoDB Conn)"]
+        Main --> WebServer
+        Main --> Cache["internal/cache.PagesCache"]
+        Main --> RoutesSetup["api/routes.InitializeRoutes"]
 
-    subgraph Backend Internal Structure
-        BackendAPI --> APIRoutes[/api/routes]
-        APIRoutes --> APIHandlers[/api/handlers]
-        APIHandlers -->|Uses DTOs| APIDTOs[/api/dto]
-        APIHandlers --> Repositories[/internal/repositories]
-        Repositories --> Models[/internal/models]
-        Repositories --> DBConnection[/internal/db]
-        DBConnection --> MongoDB
-        APIHandlers --> AppState[/internal/state]
-        APIHandlers --> TemplateEngine[/internal/templates]
-        TemplateEngine --> HTMLFiles[/internal/templates/html]
+        WebServer --> PagesRoutes["api/routes/pages.go"]
+        WebServer --> PostsAPIRoutes["api/routes/posts.go"]
+
+        PagesRoutes --> PageCacheMiddleware["Cache Middleware (in pages.go)"]
+        PageCacheMiddleware --> Cache
+        PagesRoutes --> PageHandler["api/handlers.Page"]
+
+        PostsAPIRoutes --> PostHandler["api/handlers.Post"]
+
+        PageHandler -->|Renders HTML| Templates["internal/templates"]
+        PageHandler -->|Data Ops| PostState["internal/state.PostState"]
+        Templates -->|Reads .html| HTMLFiles["internal/templates/html/"]
+
+        PostHandler -->|Data Ops| PostState
+        PostHandler -->|Invalidates| Cache
+        PostHandler -->|Uses| DTO["api/dto.PostDTO"]
+
+        PostState -->|In-memory cache| PostMap["postsMap (in PostState)"]
+        PostState -->|Delegates to| PostRepository["internal/repositories.PostRepository"]
+
+        PostRepository -->|CRUD Ops| MongoDB["MongoDB (via internal/db)"]
+        PostRepository -->|Uses| Models["internal/models.Post"]
+        DTO -->|Defines structure for| Models
     end
 
-    style User fill:#f9f,stroke:#333,stroke-width:2px
-    style BackendAPI fill:#bbf,stroke:#333,stroke-width:2px
-    style MongoDB fill:#9f9,stroke:#333,stroke-width:2px
-    style MongoExpress fill:#ff9,stroke:#333,stroke-width:2px
-    style Templates fill:#fcc,stroke:#333,stroke-width:2px
-    style Config fill:#ccf,stroke:#333,stroke-width:2px
-    style Logging fill:#ccc,stroke:#333,stroke-width:2px
+    style Client fill:#f9f,stroke:#333,stroke-width:2px
+    style WebServer fill:#ccf,stroke:#333,stroke-width:2px
+    style Main fill:#lightgrey,stroke:#333,stroke-width:2px
+    style RoutesSetup fill:#lightgrey,stroke:#333,stroke-width:2px
+
+    style PagesRoutes fill:#e6ffcc,stroke:#333,stroke-width:1px
+    style PostsAPIRoutes fill:#e6ffcc,stroke:#333,stroke-width:1px
+
+    style PageHandler fill:#ffe6cc,stroke:#333,stroke-width:1px
+    style PostHandler fill:#ffe6cc,stroke:#333,stroke-width:1px
+
+    style Templates fill:#ccffff,stroke:#333,stroke-width:1px
+    style HTMLFiles fill:#ccffff,stroke:#333,stroke-width:1px
+
+    style PostState fill:#ffffcc,stroke:#333,stroke-width:1px
+    style PostRepository fill:#ffebcc,stroke:#333,stroke-width:1px
+    style MongoDB fill:#dbdbdb,stroke:#333,stroke-width:2px
+    style DB fill:#dbdbdb,stroke:#333,stroke-width:2px
+
+    style Cache fill:#e0e0e0,stroke:#333,stroke-width:1px
+    style Config fill:#e0e0e0,stroke:#333,stroke-width:1px
+    style Models fill:#e0e0e0,stroke:#333,stroke-width:1px
+    style DTO fill:#e0e0e0,stroke:#333,stroke-width:1px
+
 ```
+
+
 
 **Explanation of Flow:**
 
