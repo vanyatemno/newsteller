@@ -1,0 +1,140 @@
+package templates
+
+import (
+	"bytes"
+	"fmt"
+	"go.uber.org/zap"
+	"html/template"
+	"newsteller/internal/models"
+)
+
+type SingleTemplate struct {
+	post *models.Post
+}
+
+func (s *SingleTemplate) GeneratePage() (string, error) {
+	tmpl, err := template.New("post").Parse(postTemplate)
+	if err != nil {
+		zap.L().Error("Error parsing template:", zap.Error(err))
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, s.post); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+const postTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.Title}}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .post {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .post-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .post-title {
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+        .post-meta {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .post-content {
+            color: #444;
+            margin: 15px 0;
+        }
+        .post-actions {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .htmx-indicator {
+            opacity: 0;
+            transition: opacity 500ms ease-in;
+        }
+        .htmx-request .htmx-indicator {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="post-container">
+        <article class="post">
+            <header class="post-header">
+                <h1 class="post-title">{{.Title}}</h1>
+                <div class="post-meta">
+                    <span>Created: {{.CreatedAt.Format "January 2, 2006 at 3:04 PM"}}</span>
+                    {{if not .UpdatedAt.IsZero}}
+                    <span> | Updated: {{.UpdatedAt.Format "January 2, 2006 at 3:04 PM"}}</span>
+                    {{end}}
+                </div>
+            </header>
+            
+            <div class="post-content">
+                <p>{{.Content}}</p>
+            </div>
+            
+            <footer class="post-actions">
+                <button class="btn-secondary" onclick="window.location.href='/posts/search'">Back to posts</button>
+                <span id="loading" class="htmx-indicator">Loading...</span>
+            </footer>
+        </article>
+    </div>
+</body>
+</html>
+`
+
+func RenderSinglePost(post *models.Post) (string, error) {
+	tmpl, err := template.New("post").Parse(postTemplate)
+	if err != nil {
+		zap.L().Error("Error parsing template:", zap.Error(err))
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, post); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}

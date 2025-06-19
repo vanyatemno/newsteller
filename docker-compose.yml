@@ -1,0 +1,71 @@
+networks:
+  newsteller:
+    name: newsteller
+
+services:
+  # MongoDB Database
+  mongo:
+    image: mongo
+    restart: always
+    container_name: newsteller-mongo-1
+    ports:
+      - "27017:27017"
+    networks:
+      newsteller:
+        aliases:
+          - mongo
+          - app  # Adding this alias to fix mongo-express connection
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - mongo_data:/data/db
+
+  # Go Backend Service
+  backend:
+    build:
+      context: ./
+      dockerfile: ./deploy/docker/backend/Dockerfile
+    container_name: newsteller-backend-1
+    ports:
+      - '${PORT}:${PORT}'
+    expose:
+      - '${PORT}'
+    env_file:
+      - ./.env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      newsteller:
+        aliases:
+          - backend
+
+  # MongoDB UI
+  mongo-express:
+    image: mongo-express
+    restart: always
+    container_name: newsteller-mongo-express-1
+    ports:
+      - "8081:8081"
+    networks:
+      - newsteller
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_ADMIN_NAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_ADMIN_PASSWORD}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo_data:

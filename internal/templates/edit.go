@@ -1,0 +1,536 @@
+package templates
+
+import (
+	"bytes"
+	"fmt"
+	"html/template"
+	"newsteller/internal/models"
+)
+
+type Edit struct {
+	post *models.Post
+}
+
+const editHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Post</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.2em;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .post-metadata {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metadata-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .metadata-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .metadata-label {
+            font-size: 0.85em;
+            font-weight: 500;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metadata-value {
+            font-size: 0.95em;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input[type="text"],
+        .form-group textarea {
+            width: -webkit-fill-available;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            background: white;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 200px;
+            line-height: 1.5;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn:disabled {
+            background: #ddd;
+            cursor: not-allowed;
+            color: #999;
+        }
+
+        .btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            margin: -8px 0 0 -8px;
+            border: 2px solid transparent;
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .field-error {
+            color: #dc3545;
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .form-group.has-error input,
+        .form-group.has-error textarea {
+            border-color: #dc3545;
+        }
+
+        .form-group.has-error .field-error {
+            display: block;
+        }
+
+        .loading-indicator {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            display: none;
+        }
+
+        .post-id {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8em;
+            color: #666;
+            background: #f1f3f4;
+            padding: 4px 8px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            .form-container {
+                padding: 20px;
+            }
+
+            .metadata-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column-reverse;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>Edit Post</h1>
+</div>
+
+<div id="messages"></div>
+
+<div class="form-container">
+    <div class="post-metadata">
+        <div class="metadata-title">Post Information</div>
+        <div class="metadata-grid">
+            <div class="metadata-item">
+                <div class="metadata-label">Post ID</div>
+                <div class="metadata-value post-id">{{.ID.Hex}}</div>
+            </div>
+            <div class="metadata-item">
+                <div class="metadata-label">Created At</div>
+                <div class="metadata-value">{{formatDateTime .CreatedAt}}</div>
+            </div>
+            <div class="metadata-item">
+                <div class="metadata-label">Last Updated</div>
+                <div class="metadata-value">{{formatDateTime .UpdatedAt}}</div>
+            </div>
+        </div>
+    </div>
+
+    <form id="edit-form"
+          hx-put="/posts/{{.ID.Hex}}"
+          hx-trigger="submit"
+          hx-target="#form-response"
+          hx-indicator=".loading-indicator">
+
+        <div class="form-group" id="title-group">
+            <label for="title">Title</label>
+            <input type="text"
+                   id="title"
+                   name="title"
+                   value="{{.Title}}"
+                   placeholder="Enter post title..."
+                   required>
+            <div class="field-error" id="title-error"></div>
+        </div>
+
+        <div class="form-group" id="content-group">
+            <label for="content">Content</label>
+            <textarea id="content"
+                      name="content"
+                      placeholder="Write your post content here..."
+                      required>{{.Content}}</textarea>
+            <div class="field-error" id="content-error"></div>
+        </div>
+
+        <div class="button-group">
+            <a href="/" class="btn btn-secondary">Return to Home Page</a>
+            <button type="submit" id="save-btn" class="btn btn-primary">
+                Save Changes
+            </button>
+        </div>
+    </form>
+
+    <div id="form-response"></div>
+</div>
+
+<div class="loading-indicator">
+    Saving...
+</div>
+
+<script>
+    // Track if there are unsaved changes
+    let hasUnsavedChanges = false;
+    const originalTitle = document.getElementById('title').value;
+    const originalContent = document.getElementById('content').value;
+
+    // Track changes
+    document.getElementById('title').addEventListener('input', checkForChanges);
+    document.getElementById('content').addEventListener('input', checkForChanges);
+
+    function checkForChanges() {
+        const currentTitle = document.getElementById('title').value;
+        const currentContent = document.getElementById('content').value;
+
+        hasUnsavedChanges = (currentTitle !== originalTitle || currentContent !== originalContent);
+
+        const saveBtn = document.getElementById('save-btn');
+        if (hasUnsavedChanges) {
+            saveBtn.style.background = '#28a745';
+            saveBtn.textContent = 'Save Changes';
+        } else {
+            saveBtn.style.background = '#007bff';
+            saveBtn.textContent = 'No Changes';
+        }
+    }
+
+    // Warn before leaving with unsaved changes
+    window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges) {
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+        }
+    });
+
+    // Handle form validation
+    document.getElementById('edit-form').addEventListener('submit', function(e) {
+        clearErrors();
+
+        const title = document.getElementById('title').value.trim();
+        const content = document.getElementById('content').value.trim();
+        let hasError = false;
+
+        if (!title) {
+            showFieldError('title', 'Title is required');
+            hasError = true;
+        }
+
+        if (!content) {
+            showFieldError('content', 'Content is required');
+            hasError = true;
+        }
+
+        if (hasError) {
+            e.preventDefault();
+            return false;
+        }
+
+        // Add loading state
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.classList.add('loading');
+        saveBtn.disabled = true;
+    });
+
+    // Handle HTMX events
+    document.body.addEventListener('htmx:beforeRequest', function() {
+        document.querySelector('.loading-indicator').style.display = 'block';
+    });
+
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        document.querySelector('.loading-indicator').style.display = 'none';
+
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.classList.remove('loading');
+        saveBtn.disabled = false;
+
+        if (evt.detail.xhr.status === 200) {
+            // Success
+            showMessage('Post updated successfully!', 'success');
+            hasUnsavedChanges = false;
+
+            // Update the "Last Updated" timestamp
+            const now = new Date();
+            const updatedElements = document.querySelectorAll('.metadata-item');
+            updatedElements.forEach(item => {
+                const label = item.querySelector('.metadata-label');
+                if (label && label.textContent === 'Last Updated') {
+                    const value = item.querySelector('.metadata-value');
+                    value.textContent = now.toLocaleString();
+                }
+            });
+
+            // Reset button appearance
+            saveBtn.style.background = '#007bff';
+            saveBtn.textContent = 'Save Changes';
+
+            // Hide success message after 4 seconds
+            setTimeout(() => {
+                const successMsg = document.querySelector('.message.success');
+                if (successMsg) {
+                    successMsg.remove();
+                }
+            }, 4000);
+        } else {
+            // Error
+            showMessage('Error updating post. Please try again.', 'error');
+
+            // Try to parse error response for field-specific errors
+            try {
+                const response = JSON.parse(evt.detail.xhr.responseText);
+                if (response.errors) {
+                    handleValidationErrors(response.errors);
+                }
+            } catch (e) {
+                // Generic error handling
+            }
+        }
+    });
+
+    function showMessage(text, type) {
+        const messagesContainer = document.getElementById('messages');
+        messagesContainer.innerHTML = ` + "`" + `<div class="message ${type}">${text}</div>` + "`" + `;
+    }
+
+    function showFieldError(fieldName, message) {
+        const group = document.getElementById(fieldName + '-group');
+        const errorElement = document.getElementById(fieldName + '-error');
+
+        group.classList.add('has-error');
+        errorElement.textContent = message;
+    }
+
+    function clearErrors() {
+        const errorGroups = document.querySelectorAll('.form-group.has-error');
+        errorGroups.forEach(group => {
+            group.classList.remove('has-error');
+        });
+
+        const errorElements = document.querySelectorAll('.field-error');
+        errorElements.forEach(error => {
+            error.textContent = '';
+        });
+
+        document.getElementById('messages').innerHTML = '';
+    }
+
+    function handleValidationErrors(errors) {
+        if (errors.title) {
+            showFieldError('title', errors.title);
+        }
+        if (errors.content) {
+            showFieldError('content', errors.content);
+        }
+    }
+
+    // Enhanced form interactions
+    document.querySelectorAll('input, textarea').forEach(input => {
+        input.addEventListener('input', function() {
+            if (this.closest('.form-group').classList.contains('has-error')) {
+                this.closest('.form-group').classList.remove('has-error');
+                this.parentElement.querySelector('.field-error').textContent = '';
+            }
+        });
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+S or Cmd+S to save
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (hasUnsavedChanges) {
+                document.getElementById('edit-form').dispatchEvent(new Event('submit'));
+            }
+        }
+    });
+</script>
+</body>
+</html>`
+
+func NewEdit(post *models.Post) *Edit {
+	return &Edit{post}
+}
+
+func (e *Edit) GeneratePage() (string, error) {
+	tmpl, err := template.New("edit-post").Funcs(funcMap).Parse(editHTML)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, e.post); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}

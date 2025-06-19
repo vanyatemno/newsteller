@@ -1,0 +1,516 @@
+package templates
+
+import (
+	"bytes"
+	"fmt"
+	"html/template"
+	"newsteller/internal/models"
+)
+
+type Home struct {
+	posts        []models.Post
+	currentPage  int
+	totalPosts   int
+	postsPerPage int
+}
+
+func NewHome(
+	posts []models.Post,
+	currentPage int,
+	totalPosts int,
+	postsPerPage int,
+) *Home {
+	return &Home{
+		posts:        posts,
+		currentPage:  currentPage,
+		totalPosts:   totalPosts,
+		postsPerPage: postsPerPage,
+	}
+}
+
+func (h *Home) GeneratePage() (string, error) {
+	totalPages := (h.totalPosts + h.postsPerPage - 1) / h.postsPerPage
+
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	if h.currentPage < 1 {
+		h.currentPage = 1
+	}
+	if h.currentPage > totalPages {
+		h.currentPage = totalPages
+	}
+
+	pageData := pageData{
+		Posts:       h.posts,
+		CurrentPage: h.currentPage,
+		TotalPages:  totalPages,
+		HasPrev:     h.currentPage > 1,
+		HasNext:     h.currentPage < totalPages,
+		PrevPage:    h.currentPage - 1,
+		NextPage:    h.currentPage + 1,
+	}
+
+	tmpl, err := template.New("posts").Funcs(funcMap).Parse(htmlTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, pageData); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// PageData represents the data passed to the template
+type pageData struct {
+	Posts       []models.Post
+	CurrentPage int
+	TotalPages  int
+	HasPrev     bool
+	HasNext     bool
+	PrevPage    int
+	NextPage    int
+}
+
+const htmlTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Posts</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .search-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .search-field {
+            width: 100%;
+            max-width: 500px;
+            padding: 12px 20px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        
+        .search-field:focus {
+            border-color: #007bff;
+        }
+        
+        .search-field::placeholder {
+            color: #999;
+        }
+        
+        .posts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .post-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        
+        .post-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .post-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #333;
+            line-height: 1.3;
+        }
+        
+        .post-content {
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+        }
+        
+        .post-date {
+            color: #999;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 40px;
+        }
+        
+        .pagination button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s ease;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        .pagination button:disabled {
+            background: #ddd;
+            cursor: not-allowed;
+            color: #999;
+        }
+        
+        .page-info {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .posts-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .pagination {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            
+            .search-field {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Home</a>
+    
+    <div class="header">
+        <h1>Posts</h1>
+    </div>
+
+    <div class="search-container">
+        <input 
+            type="text" 
+            class="search-field" 
+            placeholder="Search posts..." 
+            name="keyword"
+            hx-get="/posts"
+            hx-target="#posts-content"
+            hx-trigger="keyup changed delay:300ms, search"
+            hx-indicator=".loading"
+            hx-include="this"
+        >
+    </div>
+
+    <div id="posts-content">
+        <div class="posts-container">
+            {{range .Posts}}
+            <a href="/posts/{{.ID.Hex}}" class="post-card">
+                <div class="post-title">{{truncateContent .Title 25}}</div>
+                <div class="post-content">{{truncateContent .Content 32}}</div>
+                <div class="post-date">{{formatDate .CreatedAt}}</div>
+            </a>
+            {{else}}
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
+                No posts found.
+            </div>
+            {{end}}
+        </div>
+
+        {{if gt .TotalPages 1}}
+        <div class="pagination">
+            <button 
+                hx-get="/posts?page={{.PrevPage}}" 
+                hx-target="#posts-content"
+                hx-indicator=".loading"
+								hx-include=".search-field"
+                {{if not .HasPrev}}disabled{{end}}>
+                Previous
+            </button>
+            
+            <span class="page-info">Page {{.CurrentPage}} of {{.TotalPages}}</span>
+            
+            <button 
+                hx-get="/posts?page={{.NextPage}}" 
+                hx-target="#posts-content"
+                hx-indicator=".loading"
+								hx-include=".search-field"
+                {{if not .HasNext}}disabled{{end}}>
+                Next
+            </button>
+        </div>
+        {{end}}
+    </div>
+
+    <div class="loading" style="display: none;">
+        Loading...
+    </div>
+
+    <script>
+        // Show loading indicator during HTMX requests
+        document.body.addEventListener('htmx:beforeRequest', function() {
+            document.querySelector('.loading').style.display = 'block';
+        });
+        
+        document.body.addEventListener('htmx:afterRequest', function() {
+            document.querySelector('.loading').style.display = 'none';
+        });
+    </script>
+</body>
+</html>`
+
+//const htmlTemplate = `
+//<!DOCTYPE html>
+//<html lang="en">
+//<head>
+//    <meta charset="UTF-8">
+//    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//    <title>Posts</title>
+//    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+//    <style>
+//        body {
+//            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+//            max-width: 1200px;
+//            margin: 0 auto;
+//            padding: 20px;
+//            background-color: #f5f5f5;
+//        }
+//
+//        .header {
+//            text-align: center;
+//            margin-bottom: 40px;
+//        }
+//
+//        .posts-container {
+//            display: grid;
+//            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+//            gap: 20px;
+//            margin-bottom: 40px;
+//        }
+//
+//        .post-card {
+//            background: white;
+//            border-radius: 12px;
+//            padding: 20px;
+//            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+//            transition: transform 0.2s ease, box-shadow 0.2s ease;
+//            cursor: pointer;
+//            text-decoration: none;
+//            color: inherit;
+//            display: block;
+//        }
+//
+//        .post-card:hover {
+//            transform: translateY(-4px);
+//            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+//            text-decoration: none;
+//            color: inherit;
+//        }
+//
+//        .post-title {
+//            font-size: 1.4em;
+//            font-weight: 600;
+//            margin-bottom: 12px;
+//            color: #333;
+//            line-height: 1.3;
+//        }
+//
+//        .post-content {
+//            color: #666;
+//            line-height: 1.5;
+//            margin-bottom: 15px;
+//            font-size: 0.95em;
+//        }
+//
+//        .post-date {
+//            color: #999;
+//            font-size: 0.85em;
+//            font-weight: 500;
+//        }
+//
+//        .pagination {
+//            display: flex;
+//            justify-content: center;
+//            align-items: center;
+//            gap: 15px;
+//            margin-top: 40px;
+//        }
+//
+//        .pagination button {
+//            padding: 10px 20px;
+//            background: #007bff;
+//            color: white;
+//            border: none;
+//            border-radius: 6px;
+//            cursor: pointer;
+//            font-size: 14px;
+//            transition: background-color 0.2s ease;
+//        }
+//
+//				.back-link {
+//            display: inline-block;
+//            margin-bottom: 20px;
+//            color: #007bff;
+//            text-decoration: none;
+//            font-weight: 500;
+//            transition: color 0.2s ease;
+//        }
+//
+//        .back-link:hover {
+//            color: #0056b3;
+//            text-decoration: underline;
+//        }
+//
+//        .pagination button:hover:not(:disabled) {
+//            background: #0056b3;
+//        }
+//
+//        .pagination button:disabled {
+//            background: #ddd;
+//            cursor: not-allowed;
+//            color: #999;
+//        }
+//
+//        .page-info {
+//            font-weight: 500;
+//            color: #333;
+//        }
+//
+//        .loading {
+//            text-align: center;
+//            padding: 20px;
+//            color: #666;
+//        }
+//
+//        @media (max-width: 768px) {
+//            .posts-container {
+//                grid-template-columns: 1fr;
+//            }
+//
+//            .pagination {
+//                flex-wrap: wrap;
+//                gap: 10px;
+//            }
+//        }
+//    </style>
+//</head>
+//<body>
+//		<a href="/" class="back-link">← Back to Home</a>
+//
+//    <div class="header">
+//        <h1>Posts</h1>
+//    </div>
+//
+//    <div id="posts-content">
+//        <div class="posts-container">
+//            {{range .Posts}}
+//            <a href="/posts/{{.ID.Hex}}" class="post-card">
+//                <div class="post-title">{{truncateContent .Title 25}}</div>
+//                <div class="post-content">{{truncateContent .Content 32}}</div>
+//                <div class="post-date">{{formatDate .CreatedAt}}</div>
+//            </a>
+//            {{else}}
+//            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
+//                No posts found.
+//            </div>
+//            {{end}}
+//        </div>
+//
+//        {{if gt .TotalPages 1}}
+//        <div class="pagination">
+//            <button
+//                hx-get="/posts?page={{.PrevPage}}"
+//                hx-target="body"
+//                hx-indicator=".loading"
+//                {{if not .HasPrev}}disabled{{end}}>
+//                Previous
+//            </button>
+//
+//            <span class="page-info">Page {{.CurrentPage}} of {{.TotalPages}}</span>
+//
+//            <button
+//                hx-get="/posts?page={{.NextPage}}"
+//                hx-target="body"
+//                hx-indicator=".loading"
+//                {{if not .HasNext}}disabled{{end}}>
+//                Next
+//            </button>
+//        </div>
+//        {{end}}
+//    </div>
+//
+//    <div class="loading" style="display: none;">
+//        Loading...
+//    </div>
+//
+//    <script>
+//        // Show loading indicator during HTMX requests
+//        document.body.addEventListener('htmx:beforeRequest', function() {
+//            document.querySelector('.loading').style.display = 'block';
+//        });
+//
+//        document.body.addEventListener('htmx:afterRequest', function() {
+//            document.querySelector('.loading').style.display = 'none';
+//        });
+//    </script>
+//</body>
+//</html>
+//`
