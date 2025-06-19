@@ -80,7 +80,6 @@ The project is organized into the following main directories:
 *   **`/deploy`**: Contains deployment-related files.
     *   **`/deploy/docker`**: Docker-related configurations.
         *   **`/deploy/docker/backend/Dockerfile`**: Dockerfile for building the Go backend image.
-        *   **`/deploy/docker/database/.env`**: Environment variables specific to the database container (though typically managed by the main `.env` and `docker-compose.yml`).
 *   **`/internal`**: Contains the core business logic and internal workings of the application. This code is not intended to be imported by other projects.
     *   **`/internal/cache`**: Caching mechanisms (details inferred from `cache/rotues.go`, likely route caching).
     *   **`/internal/config`**: Configuration loading and management.
