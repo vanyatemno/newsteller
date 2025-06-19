@@ -235,7 +235,7 @@ const createPageTemplate = `
            }
 
            .btn {
-               width: 100%;
+               width: -webkit-fill-available;
                justify-content: center;
            }
        }

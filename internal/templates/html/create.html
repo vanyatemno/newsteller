@@ -148,6 +148,20 @@
             font-weight: 500;
         }
 
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
         .message.success {
             background: #d4edda;
             color: #155724;
@@ -174,20 +188,6 @@
 
         .form-group.has-error .field-error {
             display: block;
-        }
-
-        .back-link {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #007bff;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s ease;
-        }
-
-        .back-link:hover {
-            color: #0056b3;
-            text-decoration: underline;
         }
 
         .loading-indicator {
@@ -254,6 +254,7 @@
         </div>
 
         <div class="button-group">
+            <a href="/home" class="btn btn-secondary">Main Menu</a>
             <button type="submit" id="submit-btn" class="btn btn-primary">
                 Create Post
             </button>
